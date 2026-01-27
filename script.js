@@ -168,25 +168,29 @@ downloadPDFBtn.addEventListener('click', async () => {
     doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
     y += 10;
 
-    for (let err of errors) {
-        y += 10;
-        doc.text(`Error ${err.number}: ${err.error}`, 10, y);
-        y += 6;
-        doc.text(`JID: ${err.jid}`, 10, y);
-        y += 6;
+for (let err of errors) {
+    y += 10;
+    doc.text(`Error ${err.number}: ${err.error}`, 10, y);
+    y += 6;
+    doc.text(`JID: ${err.jid}`, 10, y);
+    y += 6;
 
-        for (let s of err.screenshot) {
-            if (s) {
-                try {
-                    doc.addImage(s, 'JPEG', 30, y, 150, 0);
-                    y += 50;
-                    if (y > 270) { doc.addPage(); y = 20; }
-                } catch (e) {
-                    console.error("Failed to add image to PDF", e);
-                }
+    // Ensure screenshots is an array
+    let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
+
+    for (let s of screenshots) {
+        if (s) {
+            try {
+                doc.addImage(s, 'JPEG', 30, y, 150, 0);
+                y += 50;
+                if (y > 270) { doc.addPage(); y = 20; }
+            } catch (e) {
+                console.error("Failed to add image to PDF", e);
             }
         }
     }
+}
+
 
     doc.save(`${docName}.pdf`);
 });
@@ -210,3 +214,4 @@ pasteArea.addEventListener('paste', (e) => {
 
 // --------------------------- INIT ---------------------------
 window.onload = loadErrors;
+
