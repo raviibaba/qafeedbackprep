@@ -1,0 +1,75 @@
+body {
+  background: #eef2f7;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.container {
+  width: 900px;
+  margin: 40px auto;
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+}
+
+label {
+  font-weight: 600;
+  margin-top: 15px;
+  display: block;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+}
+
+#pasteArea {
+  margin-top: 8px;
+  padding: 30px;
+  border: 2px dashed #9ca3af;
+  text-align: center;
+}
+
+#pasteArea img {
+  max-width: 120px;
+  margin: 6px;
+}
+
+button {
+  padding: 10px 22px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary {
+  background: #2563eb;
+  color: white;
+  margin-top: 20px;
+}
+
+.download {
+  background: #059669;
+  color: white;
+  margin-top: 30px;
+}
+
+.error-card {
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  margin-top: 15px;
+  border-radius: 6px;
+}
+
+.error-card img {
+  max-width: 100px;
+  margin: 5px;
+}
+
+.suggestion {
+  color: #2563eb;
+  font-size: 14px;
+  margin-top: 6px;
+}
