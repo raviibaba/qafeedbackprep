@@ -18,7 +18,6 @@
 
   <label>Error</label>
   <input type="text" id="errorText" placeholder="Enter error">
-
   <div id="grammarSuggestion" class="suggestion"></div>
 
   <label>JID</label>
@@ -28,11 +27,21 @@
   <div id="pasteArea">Paste screenshots here (Ctrl + V)</div>
 
   <button class="primary" onclick="addError()">Add Error</button>
+  <button class="remove-all" onclick="removeAllErrors()">Remove All Errors</button>
 
   <h2>Errors Added</h2>
   <div id="errorList"></div>
 
   <button class="download" onclick="downloadPDF()">Download Feedback PDF</button>
+</div>
+
+<!-- Confirm popup -->
+<div id="confirmPopup" class="popup">
+  <div class="popup-content">
+    <p id="confirmMessage"></p>
+    <button onclick="confirmRemove()">Confirm</button>
+    <button onclick="cancelRemove()">Cancel</button>
+  </div>
 </div>
 
 <script src="script.js"></script>
