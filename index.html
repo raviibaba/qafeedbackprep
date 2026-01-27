@@ -12,27 +12,29 @@
   <h1>QC Feedback Tool</h1>
 
   <label>Document Name</label>
-  <input type="text" id="docName" placeholder="Document for ...">
+  <input type="text" id="documentNameInput" placeholder="Document for ...">
+
+  <label>QA Name</label>
+  <input type="text" id="qaNameInput" placeholder="Enter your name">
 
   <hr>
 
   <label>Error</label>
-  <input type="text" id="errorText" placeholder="Enter error">
-  <div id="grammarSuggestion" class="suggestion"></div>
+  <input type="text" id="errorInput" placeholder="Enter error">
 
   <label>JID</label>
-  <input type="text" id="jid">
+  <input type="text" id="jidInput" placeholder="Enter JID">
 
-  <label>Paste Screenshot(s)</label>
-  <div id="pasteArea">Paste screenshots here (Ctrl + V)</div>
+  <label>Upload Screenshot(s)</label>
+  <input type="file" id="screenshotsInput" multiple>
 
-  <button class="primary" onclick="addError()">Add Error</button>
+  <button id="addErrorBtn">Add Error</button>
   <button class="remove-all" onclick="removeAllErrors()">Remove All Errors</button>
 
   <h2>Errors Added</h2>
-  <div id="errorList"></div>
+  <div id="errorsContainer"></div>
 
-  <button class="download" onclick="downloadPDF()">Download Feedback PDF</button>
+  <button id="downloadPDFBtn">Download Feedback PDF</button>
 </div>
 
 <!-- Confirm popup -->
