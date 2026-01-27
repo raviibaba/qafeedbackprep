@@ -158,39 +158,40 @@ downloadPDFBtn.addEventListener('click', async () => {
     const doc = new jsPDF();
 
     const docName = documentNameInput.value.trim() || 'Document Name';
-    let y = 20;
 
-    doc.setFontSize(16);
-    doc.text(docName, 105, y, { align: 'center' });
-    y += 10;
+    errors.forEach((err, index) => {
+        // Start new page for each error except the first
+        if (index !== 0) doc.addPage();
 
-    doc.setFontSize(12);
-    doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
-    y += 10;
+        let y = 20;
 
-for (let err of errors) {
-    y += 10;
-    doc.text(`Error ${err.number}: ${err.error}`, 10, y);
-    y += 6;
-    doc.text(`JID: ${err.jid}`, 10, y);
-    y += 6;
+        doc.setFontSize(16);
+        doc.text(docName, 105, y, { align: 'center' });
+        y += 10;
 
-    // Ensure screenshots is an array
-    let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
+        doc.setFontSize(12);
+        doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
+        y += 15;
 
-    for (let s of screenshots) {
-        if (s) {
-            try {
-                doc.addImage(s, 'JPEG', 30, y, 150, 0);
-                y += 50;
-                if (y > 270) { doc.addPage(); y = 20; }
-            } catch (e) {
-                console.error("Failed to add image to PDF", e);
+        doc.text(`Error ${err.number}: ${err.error}`, 10, y);
+        y += 10;
+        doc.text(`JID: ${err.jid}`, 10, y);
+        y += 10;
+
+        // Ensure screenshots is an array
+        let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
+
+        screenshots.forEach(s => {
+            if (s) {
+                try {
+                    doc.addImage(s, 'JPEG', 30, y, 150, 0); // full width 150, height auto
+                    y += 60; // space after each screenshot
+                } catch (e) {
+                    console.error("Failed to add image to PDF", e);
+                }
             }
-        }
-    }
-}
-
+        });
+    });
 
     doc.save(`${docName}.pdf`);
 });
@@ -214,4 +215,5 @@ pasteArea.addEventListener('paste', (e) => {
 
 // --------------------------- INIT ---------------------------
 window.onload = loadErrors;
+
 
