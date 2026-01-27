@@ -25,23 +25,25 @@
   <label>JID</label>
   <input type="text" id="jidInput" placeholder="Enter JID">
 
-  <label>Upload Screenshot(s)</label>
-  <input type="file" id="screenshotsInput" multiple>
+  <label>Paste Screenshot(s)</label>
+  <div id="pasteArea" contenteditable="true" style="border:2px dashed #9ca3af; min-height:100px; padding:20px; text-align:center;">
+    Paste screenshots here (Ctrl + V)
+  </div>
 
   <button id="addErrorBtn">Add Error</button>
-  <button class="remove-all" onclick="removeAllErrors()">Remove All Errors</button>
+  <button id="removeAllBtn" class="remove-all">Remove All Errors</button>
 
   <h2>Errors Added</h2>
   <div id="errorsContainer"></div>
 
-  <button id="downloadPDFBtn">Download Feedback PDF</button>
+  <button id="downloadPDFBtn" class="download">Download Feedback PDF</button>
 </div>
 
 <!-- Confirm popup -->
 <div id="confirmPopup" class="popup">
   <div class="popup-content">
     <p id="confirmMessage"></p>
-    <button onclick="confirmRemove()">Confirm</button>
+    <button id="confirmBtn">Confirm</button>
     <button onclick="cancelRemove()">Cancel</button>
   </div>
 </div>
