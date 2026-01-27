@@ -1,172 +1,149 @@
-let errors = [];
-let pastedImages = [];
-let removeIndex = null; // for popup remove
+// --------------------------- CONFIG ---------------------------
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5HW8pBraQ_QTt43a8aIqfGYhQrMp7KgNTa-aSTVA9ZIXoIhAjMmqEoDPBQX5EvEu1/exec'; // Replace with your Web App URL
 
-const pasteArea = document.getElementById("pasteArea");
-const suggestionBox = document.getElementById("grammarSuggestion");
-const errorListDiv = document.getElementById("errorList");
-const confirmPopup = document.getElementById("confirmPopup");
-const confirmMessage = document.getElementById("confirmMessage");
+// --------------------------- GLOBALS ---------------------------
+let errors = []; // store all fetched errors for UI
+let qaName = ''; // QA Name input by user
 
-// Load saved errors on page load
-window.onload = () => {
-  const savedErrors = JSON.parse(localStorage.getItem("errors") || "[]");
-  errors = savedErrors;
-  renderErrors();
-};
+// --------------------------- DOM ELEMENTS ---------------------------
+const errorInput = document.getElementById('errorInput');
+const jidInput = document.getElementById('jidInput');
+const screenshotsInput = document.getElementById('screenshotsInput');
+const addErrorBtn = document.getElementById('addErrorBtn');
+const errorsContainer = document.getElementById('errorsContainer');
+const downloadPDFBtn = document.getElementById('downloadPDFBtn');
+const qaNameInput = document.getElementById('qaNameInput');
+const documentNameInput = document.getElementById('documentNameInput');
 
-// Handle paste
-pasteArea.addEventListener("paste", e => {
-  for (let item of e.clipboardData.items) {
-    if (item.type.includes("image")) {
-      const file = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = ev => {
-        pastedImages.push(ev.target.result);
-        pasteArea.innerHTML += `<img src="${ev.target.result}">`;
-      };
-      reader.readAsDataURL(file);
+// --------------------------- UTILS ---------------------------
+
+// Convert pasted screenshots to Base64
+function getScreenshotsBase64() {
+    const files = screenshotsInput.files;
+    let base64Images = [];
+    if (files.length === 0) return [];
+    for (let i = 0; i < files.length; i++) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            base64Images.push(e.target.result);
+        };
+        reader.readAsDataURL(files[i]);
     }
-  }
-});
-
-// Basic grammar suggestion
-document.getElementById("errorText").addEventListener("blur", e => {
-  let text = e.target.value.trim();
-  if (!text) return;
-  let corrected = text.charAt(0).toUpperCase() + text.slice(1);
-  if (!corrected.endsWith(".")) corrected += ".";
-  if (corrected !== text) {
-    suggestionBox.innerText = `Suggested correction: "${corrected}"`;
-    e.target.value = corrected;
-  }
-});
-
-// Add error
-function addError() {
-  const errorText = document.getElementById("errorText").value;
-  const jid = document.getElementById("jid").value;
-  if (!errorText || !jid || pastedImages.length === 0) {
-    alert("Error, JID and screenshots are required");
-    return;
-  }
-
-  const errorData = {
-    number: errors.length + 1,
-    errorText,
-    jid,
-    images: [...pastedImages]
-  };
-  errors.push(errorData);
-  saveErrors();
-  renderErrors();
-
-  // Reset inputs
-  pastedImages = [];
-  pasteArea.innerHTML = "Paste screenshots here (Ctrl + V)";
-  document.getElementById("errorText").value = "";
-  document.getElementById("jid").value = "";
-  suggestionBox.innerText = "";
+    return base64Images;
 }
 
-// Save to localStorage
-function saveErrors() {
-  localStorage.setItem("errors", JSON.stringify(errors));
+// Auto-increment Error Number
+function getNextErrorNumber() {
+    return errors.length + 1;
 }
 
-// Render errors in UI
-function renderErrors() {
-  errorListDiv.innerHTML = "";
-  errors.forEach((err, idx) => {
-    const div = document.createElement("div");
-    div.className = "error-card";
-    div.innerHTML = `
-      <strong>Error ${err.number}: ${err.errorText}</strong><br>
-      JID: ${err.jid}<br>
-      ${err.images.map(img => `<img src="${img}">`).join("")}
-      <button class="remove-btn" onclick="promptRemove(${idx})">Remove</button>
+// Render error in UI
+function addErrorToUI(err) {
+    errors.push(err);
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-item';
+    errorDiv.innerHTML = `
+        <p><strong>Error ${err.number}:</strong> ${err.error}</p>
+        <p><strong>JID:</strong> ${err.jid}</p>
+        <div class="screenshots-container" style="text-align:center;">
+            ${err.screenshot.split(',').map(s => `<img src="${s}" style="max-width:100%; margin:5px;">`).join('')}
+        </div>
     `;
-    errorListDiv.appendChild(div);
-  });
+    errorsContainer.appendChild(errorDiv);
 }
 
-// Remove one error with confirmation
-function promptRemove(idx) {
-  removeIndex = idx;
-  confirmMessage.innerText = `Are you sure you want to remove Error ${errors[idx].number}?`;
-  confirmPopup.style.display = "block";
+// --------------------------- FETCH ERRORS ---------------------------
+async function loadErrors() {
+    try {
+        const res = await fetch(SHEET_URL);
+        const data = await res.json();
+        data.forEach(err => addErrorToUI(err));
+    } catch (err) {
+        console.error("Failed to fetch errors:", err);
+    }
 }
 
-// Remove all errors with confirmation
-function removeAllErrors() {
-  removeIndex = "all";
-  confirmMessage.innerText = `Are you sure you want to remove all errors?`;
-  confirmPopup.style.display = "block";
-}
+// --------------------------- ADD ERROR ---------------------------
+addErrorBtn.addEventListener('click', async () => {
+    qaName = qaNameInput.value.trim();
+    if (!qaName) { alert('Please enter QA Name'); return; }
 
-// Confirm removal
-function confirmRemove() {
-  if (removeIndex === "all") {
-    errors = [];
-  } else if (removeIndex !== null) {
-    errors.splice(removeIndex, 1);
-    // Re-number errors
-    errors.forEach((err, i) => err.number = i + 1);
-  }
-  saveErrors();
-  renderErrors();
-  confirmPopup.style.display = "none";
-  removeIndex = null;
-}
+    const errorText = errorInput.value.trim();
+    const jid = jidInput.value.trim();
+    const screenshots = getScreenshotsBase64();
 
-// Cancel removal
-function cancelRemove() {
-  confirmPopup.style.display = "none";
-  removeIndex = null;
-}
+    if (!errorText || !jid) { alert('Please enter Error and JID'); return; }
 
-// Download PDF (same as before)
-function downloadPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF("p", "pt");
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  let y = 120;
+    const errorNumber = getNextErrorNumber();
+    const payload = {
+        number: errorNumber,
+        qa: qaName,
+        date: new Date().toLocaleString(),
+        error: errorText,
+        jid: jid,
+        screenshot: screenshots.join(',')
+    };
 
-  const docName = document.getElementById("docName").value || "QC Feedback Document";
+    try {
+        const res = await fetch(SHEET_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const result = await res.text();
+        if (result === 'success') {
+            addErrorToUI(payload);
+            errorInput.value = '';
+            jidInput.value = '';
+            screenshotsInput.value = '';
+        } else {
+            alert('Failed to add error');
+        }
+    } catch (err) {
+        console.error("Failed to add error:", err);
+    }
+});
 
-  doc.setFontSize(18);
-  doc.text(docName, pageWidth / 2, 40, { align: "center" });
-  doc.line(40, 55, pageWidth - 40, 55);
-  doc.setFontSize(14);
-  doc.text(`Total errors added – ${errors.length}`, pageWidth / 2, 80, { align: "center" });
-  doc.line(40, 95, pageWidth - 40, 95);
+// --------------------------- GENERATE PDF ---------------------------
+downloadPDFBtn.addEventListener('click', async () => {
+    // Fetch latest errors
+    const res = await fetch(SHEET_URL);
+    const data = await res.json();
 
-  errors.forEach(err => {
-    doc.setFontSize(14);
-    doc.text(`Error ${err.number}: ${err.errorText}`, 40, y);
-    y += 22;
-    doc.text(`JID: ${err.jid}`, 40, y);
-    y += 30;
-    err.images.forEach(img => {
-      const props = doc.getImageProperties(img);
-      let imgW = props.width;
-      let imgH = props.height;
-      const maxW = pageWidth - 80;
-      const maxH = pageHeight - y - 40;
-      const scale = Math.min(1, maxW / imgW, maxH / imgH);
-      imgW *= scale;
-      imgH *= scale;
-      const x = (pageWidth - imgW) / 2;
-      doc.addImage(img, props.fileType, x, y, imgW, imgH);
-      y += imgH + 25;
-      if (y > pageHeight - 100) {
-        doc.addPage();
-        y = 80;
-      }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const docName = documentNameInput.value.trim() || 'Document Name';
+    let y = 20;
+
+    doc.setFontSize(16);
+    doc.text(docName, 105, y, { align: 'center' });
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total errors added: ${data.length}`, 105, y, { align: 'center' });
+    y += 10;
+
+    data.forEach(err => {
+        y += 10;
+        doc.text(`Error ${err.number}: ${err.error}`, 10, y);
+        y += 6;
+        doc.text(`JID: ${err.jid}`, 10, y);
+        y += 6;
+
+        // Add screenshots
+        const screenshots = err.screenshot.split(',');
+        screenshots.forEach((s, idx) => {
+            if (s) {
+                doc.addImage(s, 'JPEG', 30, y, 150, 0); // 0 height keeps aspect ratio
+                y += 50;
+                if (y > 270) doc.addPage(); y = 20;
+            }
+        });
     });
-    y += 20;
-  });
 
-  doc.save("QC_Feedback.pdf");
-}
+    doc.save(`${docName}.pdf`);
+});
+
+// --------------------------- INIT ---------------------------
+window.onload = loadErrors;
