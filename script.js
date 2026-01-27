@@ -28,34 +28,31 @@ function getPastedScreenshots() {
     return Array.from(images).map(img => img.src);
 }
 
-// Auto-increment Error Number
-function getNextErrorNumber() {
-    return errors.length + 1;
-}
+// Render all errors in UI and renumber
+function renderErrors() {
+    errorsContainer.innerHTML = '';
+    errors.forEach((err, index) => {
+        err.number = index + 1; // Update number dynamically
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-card';
+        errorDiv.innerHTML = `
+            <p><strong>Error ${err.number}:</strong> ${err.error}</p>
+            <p><strong>JID:</strong> ${err.jid}</p>
+            <div style="text-align:center;">
+                ${err.screenshot.map(s => `<img src="${s}" />`).join('')}
+            </div>
+            <button class="remove-btn">Remove</button>
+        `;
 
-// Render a single error in UI
-function addErrorToUI(err) {
-    errors.push(err);
+        // Remove single error
+        errorDiv.querySelector('.remove-btn').addEventListener('click', () => {
+            pendingRemoveIndex = index;
+            confirmMessage.textContent = `Are you sure you want to remove Error ${err.number}?`;
+            confirmPopup.style.display = 'block';
+        });
 
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-card';
-    errorDiv.innerHTML = `
-        <p><strong>Error ${err.number}:</strong> ${err.error}</p>
-        <p><strong>JID:</strong> ${err.jid}</p>
-        <div style="text-align:center;">
-            ${err.screenshot.map(s => `<img src="${s}" />`).join('')}
-        </div>
-        <button class="remove-btn">Remove</button>
-    `;
-
-    // Remove single error
-    errorDiv.querySelector('.remove-btn').addEventListener('click', () => {
-        pendingRemoveIndex = err.number - 1;
-        confirmMessage.textContent = `Are you sure you want to remove Error ${err.number}?`;
-        confirmPopup.style.display = 'block';
+        errorsContainer.appendChild(errorDiv);
     });
-
-    errorsContainer.appendChild(errorDiv);
 }
 
 // --------------------------- FETCH ERRORS ---------------------------
@@ -63,7 +60,15 @@ async function loadErrors() {
     try {
         const res = await fetch(SHEET_URL);
         const data = await res.json();
-        data.forEach(err => addErrorToUI(err));
+        errors = data.map(err => ({
+            number: err.number,
+            qa: err.qa,
+            date: err.date,
+            error: err.error,
+            jid: err.jid,
+            screenshot: Array.isArray(err.screenshot) ? err.screenshot : err.screenshot.split(',')
+        }));
+        renderErrors();
     } catch (err) {
         console.error("Failed to fetch errors:", err);
     }
@@ -78,9 +83,12 @@ addErrorBtn.addEventListener('click', async () => {
     const jid = jidInput.value.trim();
     const screenshots = getPastedScreenshots();
 
-    if (!errorText || !jid || screenshots.length === 0) { alert('Please enter error, JID, and paste at least one screenshot'); return; }
+    if (!errorText || !jid || screenshots.length === 0) { 
+        alert('Please enter error, JID, and paste at least one screenshot'); 
+        return; 
+    }
 
-    const errorNumber = getNextErrorNumber();
+    const errorNumber = errors.length + 1;
     const payload = {
         number: errorNumber,
         qa: qaName,
@@ -97,7 +105,8 @@ addErrorBtn.addEventListener('click', async () => {
         });
         const result = await res.text();
         if (result === 'success') {
-            addErrorToUI(payload);
+            errors.push(payload);
+            renderErrors();
             errorInput.value = '';
             jidInput.value = '';
             pasteArea.innerHTML = '';
@@ -111,13 +120,18 @@ addErrorBtn.addEventListener('click', async () => {
 
 // --------------------------- REMOVE ERRORS ---------------------------
 function confirmRemove() {
-    if (pendingRemoveIndex !== null) {
-        const removed = errors.splice(pendingRemoveIndex, 1);
+    if (pendingRemoveIndex === 'all') {
+        errors = [];
         errorsContainer.innerHTML = '';
-        errors.forEach(err => addErrorToUI(err));
         pendingRemoveIndex = null;
         confirmPopup.style.display = 'none';
-        // TODO: remove from Google Sheet backend
+        // TODO: Remove all from Google Sheet backend
+    } else if (pendingRemoveIndex !== null) {
+        errors.splice(pendingRemoveIndex, 1);
+        pendingRemoveIndex = null;
+        renderErrors();
+        confirmPopup.style.display = 'none';
+        // TODO: Remove single error from Google Sheet backend
     }
 }
 
@@ -134,23 +148,11 @@ removeAllBtn.addEventListener('click', () => {
     confirmPopup.style.display = 'block';
 });
 
-// Confirm remove all
-confirmBtn.addEventListener('click', () => {
-    if (pendingRemoveIndex === 'all') {
-        errors = [];
-        errorsContainer.innerHTML = '';
-        pendingRemoveIndex = null;
-        confirmPopup.style.display = 'none';
-        // TODO: remove all from Google Sheet backend
-    } else {
-        confirmRemove();
-    }
-});
+confirmBtn.addEventListener('click', confirmRemove);
 
 // --------------------------- PDF GENERATION ---------------------------
 downloadPDFBtn.addEventListener('click', async () => {
-    const res = await fetch(SHEET_URL);
-    const data = await res.json();
+    if (errors.length === 0) { alert("No errors to download"); return; }
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -163,24 +165,28 @@ downloadPDFBtn.addEventListener('click', async () => {
     y += 10;
 
     doc.setFontSize(12);
-    doc.text(`Total errors added: ${data.length}`, 105, y, { align: 'center' });
+    doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
     y += 10;
 
-    data.forEach(err => {
+    for (let err of errors) {
         y += 10;
         doc.text(`Error ${err.number}: ${err.error}`, 10, y);
         y += 6;
         doc.text(`JID: ${err.jid}`, 10, y);
         y += 6;
 
-        err.screenshot.forEach(s => {
+        for (let s of err.screenshot) {
             if (s) {
-                doc.addImage(s, 'JPEG', 30, y, 150, 0);
-                y += 50;
-                if (y > 270) doc.addPage(); y = 20;
+                try {
+                    doc.addImage(s, 'JPEG', 30, y, 150, 0);
+                    y += 50;
+                    if (y > 270) { doc.addPage(); y = 20; }
+                } catch (e) {
+                    console.error("Failed to add image to PDF", e);
+                }
             }
-        });
-    });
+        }
+    }
 
     doc.save(`${docName}.pdf`);
 });
