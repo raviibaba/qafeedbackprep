@@ -33,6 +33,15 @@ function fixBase64(s) {
     return s;
 }
 
+// Safe filename generator
+function getSafeFileName() {
+    const docName = documentNameInput.value.trim() || "QC_Feedback";
+
+    return docName
+        .replace(/[<>:"/\\|?*]+/g, '')   // remove invalid chars
+        .replace(/\s+/g, '_');           // spaces → underscore
+}
+
 // Get pasted screenshots
 function getPastedScreenshots() {
     const images = pasteArea.querySelectorAll('img');
@@ -197,10 +206,12 @@ function generatePDF() {
     return doc;
 }
 
-// Download PDF
+// --------------------------- DOWNLOAD ---------------------------
 downloadPDFBtn.addEventListener('click', () => {
     if (errors.length === 0) return alert("No errors");
-    generatePDF().save("QC_Feedback.pdf");
+
+    const fileName = getSafeFileName();
+    generatePDF().save(fileName + ".pdf");
 });
 
 // --------------------------- EMAIL ---------------------------
@@ -214,6 +225,7 @@ sendEmailBtn.addEventListener('click', async () => {
 
     try {
         const pdfBase64 = generatePDF().output('datauristring');
+        const fileName = getSafeFileName();
 
         const res = await fetch(EMAIL_API_URL, {
             method: "POST",
@@ -223,7 +235,7 @@ sendEmailBtn.addEventListener('click', async () => {
                 subject,
                 body,
                 attachment: pdfBase64,
-                fileName: "QC_Feedback.pdf"
+                fileName: fileName + ".pdf"
             })
         });
 
