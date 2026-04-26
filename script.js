@@ -1,6 +1,6 @@
 // --------------------------- CONFIG ---------------------------
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5HW8pBraQ_QTt43a8aIqfGYhQrMp7KgNTa-aSTVA9ZIXoIhAjMmqEoDPBQX5EvEu1/exec'; // Replace with your Google Apps Script Web App URL
-const EMAIL_API_URL = ' https://script.google.com/macros/s/AKfycbyp0jbfge86yZcTuY7khppq1uajPNPd8MeSxH4QfVxptrvObBviQA73nJdyrKlmWKEi/exec';
+const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbyp0jbfge86yZcTuY7khppq1uajPNPd8MeSxH4QfVxptrvObBviQA73nJdyrKlmWKEi/exec';
 // --------------------------- GLOBALS ---------------------------
 let errors = []; // Store all errors
 let pendingRemoveIndex = null; // For popup confirmation
