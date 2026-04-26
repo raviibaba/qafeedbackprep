@@ -1,11 +1,12 @@
 // --------------------------- CONFIG ---------------------------
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5HW8pBraQ_QTt43a8aIqfGYhQrMp7KgNTa-aSTVA9ZIXoIhAjMmqEoDPBQX5EvEu1/exec'; // Replace with your Google Apps Script Web App URL
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5HW8pBraQ_QTt43a8aIqfGYhQrMp7KgNTa-aSTVA9ZIXoIhAjMmqEoDPBQX5EvEu1/exec';
 const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbyp0jbfge86yZcTuY7khppq1uajPNPd8MeSxH4QfVxptrvObBviQA73nJdyrKlmWKEi/exec';
-// --------------------------- GLOBALS ---------------------------
-let errors = []; // Store all errors
-let pendingRemoveIndex = null; // For popup confirmation
 
-// --------------------------- DOM ELEMENTS ---------------------------
+// --------------------------- GLOBALS ---------------------------
+let errors = [];
+let pendingRemoveIndex = null;
+
+// --------------------------- DOM ---------------------------
 const errorInput = document.getElementById('errorInput');
 const jidInput = document.getElementById('jidInput');
 const errorsContainer = document.getElementById('errorsContainer');
@@ -19,35 +20,47 @@ const removeAllBtn = document.getElementById('removeAllBtn');
 const confirmPopup = document.getElementById('confirmPopup');
 const confirmMessage = document.getElementById('confirmMessage');
 const confirmBtn = document.getElementById('confirmBtn');
+const sendEmailBtn = document.getElementById('sendEmailBtn');
 
-// --------------------------- UTILS ---------------------------
+// --------------------------- HELPERS ---------------------------
 
-// Get screenshots pasted in pasteArea as Base64
+// Fix Base64 issue
+function fixBase64(s) {
+    if (!s) return "";
+    if (!s.startsWith("data:image")) {
+        return "data:image/png;base64," + s;
+    }
+    return s;
+}
+
+// Get pasted screenshots
 function getPastedScreenshots() {
     const images = pasteArea.querySelectorAll('img');
     return Array.from(images).map(img => img.src);
 }
 
-// Render all errors in UI and renumber
+// --------------------------- RENDER ---------------------------
 function renderErrors() {
     errorsContainer.innerHTML = '';
+
     errors.forEach((err, index) => {
-        err.number = index + 1; // Update number dynamically
+        err.number = index + 1;
+
         const errorDiv = document.createElement('div');
         errorDiv.className = 'error-card';
+
         errorDiv.innerHTML = `
             <p><strong>Error ${err.number}:</strong> ${err.error}</p>
             <p><strong>JID:</strong> ${err.jid}</p>
             <div style="text-align:center;">
-                ${err.screenshot.map(s => `<img src="${s}" />`).join('')}
+                ${err.screenshot.map(s => `<img src="${fixBase64(s)}" onerror="this.style.display='none'"/>`).join('')}
             </div>
             <button class="remove-btn">Remove</button>
         `;
 
-        // Remove single error
         errorDiv.querySelector('.remove-btn').addEventListener('click', () => {
             pendingRemoveIndex = index;
-            confirmMessage.textContent = `Are you sure you want to remove Error ${err.number}?`;
+            confirmMessage.textContent = `Remove Error ${err.number}?`;
             confirmPopup.style.display = 'block';
         });
 
@@ -55,42 +68,46 @@ function renderErrors() {
     });
 }
 
-// --------------------------- FETCH ERRORS ---------------------------
+// --------------------------- LOAD ---------------------------
 async function loadErrors() {
     try {
         const res = await fetch(SHEET_URL);
         const data = await res.json();
+
         errors = data.map(err => ({
             number: err.number,
             qa: err.qa,
             date: err.date,
             error: err.error,
             jid: err.jid,
-            screenshot: Array.isArray(err.screenshot) ? err.screenshot : err.screenshot.split(',')
+            screenshot: (Array.isArray(err.screenshot)
+                ? err.screenshot
+                : (err.screenshot || "").split(',')
+            ).map(fixBase64)
         }));
+
         renderErrors();
+
     } catch (err) {
-        console.error("Failed to fetch errors:", err);
+        console.error("Fetch error:", err);
     }
 }
 
 // --------------------------- ADD ERROR ---------------------------
 addErrorBtn.addEventListener('click', async () => {
-    const qaName = qaNameInput.value.trim();
-    if (!qaName) { alert('Please enter QA Name'); return; }
 
+    const qaName = qaNameInput.value.trim();
     const errorText = errorInput.value.trim();
     const jid = jidInput.value.trim();
     const screenshots = getPastedScreenshots();
 
-    if (!errorText || !jid || screenshots.length === 0) { 
-        alert('Please enter error, JID, and paste at least one screenshot'); 
-        return; 
+    if (!qaName || !errorText || !jid || screenshots.length === 0) {
+        alert("Fill all fields + paste screenshot");
+        return;
     }
 
-    const errorNumber = errors.length + 1;
     const payload = {
-        number: errorNumber,
+        number: errors.length + 1,
         qa: qaName,
         date: new Date().toLocaleString(),
         error: errorText,
@@ -103,74 +120,65 @@ addErrorBtn.addEventListener('click', async () => {
             method: 'POST',
             body: JSON.stringify(payload)
         });
+
         const result = await res.text();
+
         if (result === 'success') {
             errors.push(payload);
             renderErrors();
+
             errorInput.value = '';
             jidInput.value = '';
             pasteArea.innerHTML = '';
-        } else {
-            alert('Failed to add error');
         }
+
     } catch (err) {
-        console.error("Failed to add error:", err);
+        console.error(err);
     }
 });
 
-// --------------------------- REMOVE ERRORS ---------------------------
+// --------------------------- REMOVE ---------------------------
 function confirmRemove() {
     if (pendingRemoveIndex === 'all') {
         errors = [];
-        errorsContainer.innerHTML = '';
-        pendingRemoveIndex = null;
-        confirmPopup.style.display = 'none';
-        // TODO: Remove all from Google Sheet backend
-    } else if (pendingRemoveIndex !== null) {
+    } else {
         errors.splice(pendingRemoveIndex, 1);
-        pendingRemoveIndex = null;
-        renderErrors();
-        confirmPopup.style.display = 'none';
-        // TODO: Remove single error from Google Sheet backend
     }
-}
 
-function cancelRemove() {
+    renderErrors();
     pendingRemoveIndex = null;
     confirmPopup.style.display = 'none';
 }
 
-// Remove all errors
+function cancelRemove() {
+    confirmPopup.style.display = 'none';
+}
+
 removeAllBtn.addEventListener('click', () => {
-    if (errors.length === 0) return;
     pendingRemoveIndex = 'all';
-    confirmMessage.textContent = `Are you sure you want to remove all errors?`;
+    confirmMessage.textContent = "Remove all errors?";
     confirmPopup.style.display = 'block';
 });
 
 confirmBtn.addEventListener('click', confirmRemove);
 
-// --------------------------- PDF GENERATION ---------------------------
-downloadPDFBtn.addEventListener('click', async () => {
-    if (errors.length === 0) { alert("No errors to download"); return; }
-
+// --------------------------- PDF ---------------------------
+function generatePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    const docName = documentNameInput.value.trim() || 'Document Name';
+    const docName = documentNameInput.value || "QC Feedback";
 
     errors.forEach((err, index) => {
-        // Start new page for each error except the first
+
         if (index !== 0) doc.addPage();
 
         let y = 20;
 
-        doc.setFontSize(16);
         doc.text(docName, 105, y, { align: 'center' });
         y += 10;
 
-        doc.setFontSize(12);
-        doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
+        doc.text(`Total errors: ${errors.length}`, 105, y, { align: 'center' });
         y += 15;
 
         doc.text(`Error ${err.number}: ${err.error}`, 10, y);
@@ -178,118 +186,45 @@ downloadPDFBtn.addEventListener('click', async () => {
         doc.text(`JID: ${err.jid}`, 10, y);
         y += 10;
 
-        // Ensure screenshots is an array
-        let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
-
-        screenshots.forEach(s => {
-            if (s) {
-                try {
-                    doc.addImage(s, 'JPEG', 30, y, 150, 0); // full width 150, height auto
-                    y += 60; // space after each screenshot
-                } catch (e) {
-                    console.error("Failed to add image to PDF", e);
-                }
-            }
+        err.screenshot.forEach(s => {
+            try {
+                doc.addImage(fixBase64(s), 'PNG', 30, y, 150, 0);
+                y += 60;
+            } catch {}
         });
     });
 
-    doc.save(`${docName}.pdf`);
-});
-
-// --------------------------- PASTE HANDLER ---------------------------
-pasteArea.addEventListener('paste', (e) => {
-    const items = e.clipboardData.items;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-            const file = items[i].getAsFile();
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = document.createElement('img');
-                img.src = event.target.result;
-                pasteArea.appendChild(img);
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-});
-
-// --------------------------- INIT ---------------------------
-window.onload = loadErrors;
-
-
-async function generatePDFBase64() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    const docName = documentNameInput.value.trim() || 'Document Name';
-
-    errors.forEach((err, index) => {
-        if (index !== 0) doc.addPage();
-
-        let y = 20;
-
-        doc.setFontSize(16);
-        doc.text(docName, 105, y, { align: 'center' });
-        y += 10;
-
-        doc.setFontSize(12);
-        doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
-        y += 15;
-
-        doc.text(`Error ${err.number}: ${err.error}`, 10, y);
-        y += 10;
-        doc.text(`JID: ${err.jid}`, 10, y);
-        y += 10;
-
-        let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
-
-        screenshots.forEach(s => {
-            if (s) {
-                try {
-                    doc.addImage(s, 'JPEG', 30, y, 150, 0);
-                    y += 60;
-                } catch (e) {
-                    console.error("Image error:", e);
-                }
-            }
-        });
-    });
-
-    return doc.output('datauristring'); // 🔥 IMPORTANT
+    return doc;
 }
 
-const sendEmailBtn = document.getElementById('sendEmailBtn');
+// Download PDF
+downloadPDFBtn.addEventListener('click', () => {
+    if (errors.length === 0) return alert("No errors");
+    generatePDF().save("QC_Feedback.pdf");
+});
 
+// --------------------------- EMAIL ---------------------------
 sendEmailBtn.addEventListener('click', async () => {
+
     const emailTo = document.getElementById('emailTo').value.trim();
-    const subject = document.getElementById('emailSubject').value || "QC Feedback Report";
-    const body = document.getElementById('emailBody').value || "Please find the QC feedback attached.";
+    const subject = document.getElementById('emailSubject').value || "QC Feedback";
+    const body = document.getElementById('emailBody').value || "Please find attached feedback.";
 
-    if (!emailTo) {
-        alert("Please enter recipient email");
-        return;
-    }
-
-    if (errors.length === 0) {
-        alert("No errors to send");
-        return;
-    }
+    if (!emailTo) return alert("Enter email");
 
     try {
-        const pdfBase64 = await generatePDFBase64();
-
-        const payload = {
-            action: "sendEmail",
-            emailTo,
-            subject,
-            body,
-            attachment: pdfBase64,
-            fileName: "QC_Feedback.pdf"
-        };
+        const pdfBase64 = generatePDF().output('datauristring');
 
         const res = await fetch(EMAIL_API_URL, {
             method: "POST",
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                action: "sendEmail",
+                emailTo,
+                subject,
+                body,
+                attachment: pdfBase64,
+                fileName: "QC_Feedback.pdf"
+            })
         });
 
         const result = await res.text();
@@ -297,6 +232,29 @@ sendEmailBtn.addEventListener('click', async () => {
 
     } catch (err) {
         console.error(err);
-        alert("Failed to send email");
+        alert("Email failed");
     }
 });
+
+// --------------------------- PASTE ---------------------------
+pasteArea.addEventListener('paste', (e) => {
+    const items = e.clipboardData.items;
+
+    for (let item of items) {
+        if (item.type.includes("image")) {
+            const file = item.getAsFile();
+            const reader = new FileReader();
+
+            reader.onload = e => {
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                pasteArea.appendChild(img);
+            };
+
+            reader.readAsDataURL(file);
+        }
+    }
+});
+
+// --------------------------- INIT ---------------------------
+window.onload = loadErrors;
