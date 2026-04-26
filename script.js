@@ -1,6 +1,6 @@
 // --------------------------- CONFIG ---------------------------
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw5HW8pBraQ_QTt43a8aIqfGYhQrMp7KgNTa-aSTVA9ZIXoIhAjMmqEoDPBQX5EvEu1/exec'; // Replace with your Google Apps Script Web App URL
-
+const EMAIL_API_URL = ' https://script.google.com/macros/s/AKfycbyp0jbfge86yZcTuY7khppq1uajPNPd8MeSxH4QfVxptrvObBviQA73nJdyrKlmWKEi/exec';
 // --------------------------- GLOBALS ---------------------------
 let errors = []; // Store all errors
 let pendingRemoveIndex = null; // For popup confirmation
@@ -217,3 +217,86 @@ pasteArea.addEventListener('paste', (e) => {
 window.onload = loadErrors;
 
 
+async function generatePDFBase64() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const docName = documentNameInput.value.trim() || 'Document Name';
+
+    errors.forEach((err, index) => {
+        if (index !== 0) doc.addPage();
+
+        let y = 20;
+
+        doc.setFontSize(16);
+        doc.text(docName, 105, y, { align: 'center' });
+        y += 10;
+
+        doc.setFontSize(12);
+        doc.text(`Total errors added: ${errors.length}`, 105, y, { align: 'center' });
+        y += 15;
+
+        doc.text(`Error ${err.number}: ${err.error}`, 10, y);
+        y += 10;
+        doc.text(`JID: ${err.jid}`, 10, y);
+        y += 10;
+
+        let screenshots = Array.isArray(err.screenshot) ? err.screenshot : [err.screenshot];
+
+        screenshots.forEach(s => {
+            if (s) {
+                try {
+                    doc.addImage(s, 'JPEG', 30, y, 150, 0);
+                    y += 60;
+                } catch (e) {
+                    console.error("Image error:", e);
+                }
+            }
+        });
+    });
+
+    return doc.output('datauristring'); // 🔥 IMPORTANT
+}
+
+const sendEmailBtn = document.getElementById('sendEmailBtn');
+
+sendEmailBtn.addEventListener('click', async () => {
+    const emailTo = document.getElementById('emailTo').value.trim();
+    const subject = document.getElementById('emailSubject').value || "QC Feedback Report";
+    const body = document.getElementById('emailBody').value || "Please find the QC feedback attached.";
+
+    if (!emailTo) {
+        alert("Please enter recipient email");
+        return;
+    }
+
+    if (errors.length === 0) {
+        alert("No errors to send");
+        return;
+    }
+
+    try {
+        const pdfBase64 = await generatePDFBase64();
+
+        const payload = {
+            action: "sendEmail",
+            emailTo,
+            subject,
+            body,
+            attachment: pdfBase64,
+            fileName: "QC_Feedback.pdf"
+        };
+
+        const res = await fetch(EMAIL_API_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.text();
+        alert(result);
+
+    } catch (err) {
+        console.error(err);
+        alert("Failed to send email");
+    }
+});
